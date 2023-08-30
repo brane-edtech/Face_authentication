@@ -6,10 +6,10 @@ from compreface.service import VerificationService
 from collections import OrderedDict
 from fastapi.middleware.cors import CORSMiddleware
 import base64
-AWS_BUCKET_NAME = "brane"
-AWS_REGION = "ap-south-1"
-AWS_ACCESS_KEY = "AKIA2FGQE42WF6GRWSU3"
-AWS_SECRET_KEY = "/PvCCwmV/eKvras1SEoPg1qJL2SAjs9qF4BUY6fL"
+AWS_BUCKET_NAME = "your-bucket"
+AWS_REGION = "your-region"
+AWS_ACCESS_KEY = "Your-access-key"
+AWS_SECRET_KEY = "Your-secret-key"
 base_url = f"https://{AWS_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/"
 AWS_S3_FOLDER = "face_images"
 
