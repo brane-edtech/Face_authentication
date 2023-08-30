@@ -74,6 +74,7 @@ soupsieve==2.4.1
 starlette==0.27.0
 tensorboard==2.12.3
 tensorboard-data-server==0.7.1
+tensorflow-io-gcs-filesystem==0.32.0
 tensorflow==2.12.0
 tensorflow-estimator==2.12.0
 termcolor==2.3.0
