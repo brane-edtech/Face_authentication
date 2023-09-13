@@ -1,17 +1,26 @@
 from fastapi import FastAPI, UploadFile, Form, File
-import os, io, boto3
+import os, io, boto3, pymongo
 from PIL import Image
 from compreface import CompreFace
 from compreface.service import VerificationService
 from collections import OrderedDict
 from fastapi.middleware.cors import CORSMiddleware
 import base64
-AWS_BUCKET_NAME = "your-bucket"
-AWS_REGION = "your-region"
-AWS_ACCESS_KEY = "Your-access-key"
-AWS_SECRET_KEY = "Your-secret-key"
+AWS_BUCKET_NAME = "Your Bucket"
+AWS_REGION = "ap-south-1"
+AWS_ACCESS_KEY = "Your Access key"
+AWS_SECRET_KEY = "Your Secret Key"
 base_url = f"https://{AWS_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/"
 AWS_S3_FOLDER = "face_images"
+
+MONGO_CONNECTION_STRING = "Your Mongo string" 
+MONGO_DB_NAME = "Your DB" 
+MONGO_COLLECTION_NAME = "Your Collection"
+
+client = pymongo.MongoClient(MONGO_CONNECTION_STRING)
+db = client[MONGO_DB_NAME]
+collection = db[MONGO_COLLECTION_NAME]
+
 
 s3 = boto3.client(
     "s3",
@@ -42,6 +51,7 @@ def perform_verification(image_path1: str, image_path2: str, domain: str, port: 
     verify = compre_face.init_face_verification(verification_api_key)
 
     data = verify.verify(image_path1, image_path2)
+    print(data)
     # print(data)
     # print(data)
     # print(type(data))
@@ -82,12 +92,13 @@ def base64_to_jpg(base64_string, output_path):
 def signin(image_path, path):
     DOMAIN: str = 'http://localhost'
     PORT: str = '8000'
-    VERIFICATION_API_KEY: str = 'ed19ef6a-53a9-4e37-a5e6-80b6dbb4ea02'
+    VERIFICATION_API_KEY: str = 'b925454d-8651-48f4-ba98-768ac98f8e21'
 
     get_images= get_images_from_folders(path)
     similarity= []
     for i in get_images:
         similar= perform_verification(i, image_path, DOMAIN, PORT, VERIFICATION_API_KEY)
+        print(similar)
         if similar!= False and similar>0.97:
             temp=[]
             temp.append(i)
@@ -103,9 +114,27 @@ def signin(image_path, path):
         mob= similarity[-1][0][7:].split("_")[0]
         print("mob is ,", mob)
         child= similarity[-1][0][7:].split("_")[1][:1]
-        print(similarity)   
+        print(similarity)  
+        
+        query = {
+                    "parentsmobileno": mob
+                }
 
-        return OrderedDict({"success": True, "mob": mob, "child": child})
+        result = collection.find_one(query)
+        data= result['child'][int(child-1)]
+        student_name= data['childname']
+        
+        medium_of_instruction= data["mediumofinstruction"]
+        
+        grade= data['childclass']
+        curriculum= data['childsyllabus']
+        
+
+        return OrderedDict({"success": True, "student_name": student_name,
+        "medium_of_instruction": medium_of_instruction,
+        "grade": grade,
+        "curriculum": curriculum
+        })
 
     else:
         return OrderedDict({"success": False})
@@ -134,31 +163,47 @@ app.add_middleware(
 
 @app.post("/signup/")
 async def signup(
-    mobile_number: str = Form(...),
-    child_no: str = Form(...),
-    image: str = Form(...)
+    mobile_number: str = Form(None),
+    child_no: str = Form(None),
+    image: str = Form(None)
 ):
-    base_folder = "signup"
-    
-    filename= f"{mobile_number}_{child_no}.jpg"
-    image_path = os.path.join(base_folder, filename)
-    base64_to_jpg(image, image_path)
-    print(image_path)
-    #path= AWS_S3_FOLDER+image_path
-    s3.upload_file(image_path, AWS_BUCKET_NAME, AWS_S3_FOLDER+"/"+image_path[7:])
-    print(base_url+AWS_S3_FOLDER+"/"+image_path[7:])
-    print("successful")
-    return {"message": "Signup successful", "url":base_url+AWS_S3_FOLDER+"/"+image_path[7:]}
+    try:
+        base64.b64decode(image)
+        base_folder = "signup"
+        
+        filename= f"{mobile_number}_{child_no}.jpg"
+        image_path = os.path.join(base_folder, filename)
+        base64_to_jpg(image, image_path)
+        print(image_path)
+        #path= AWS_S3_FOLDER+image_path
+        s3.upload_file(image_path, AWS_BUCKET_NAME, AWS_S3_FOLDER+"/"+image_path[7:])
+        print(base_url+AWS_S3_FOLDER+"/"+image_path[7:])
+        print("successful")
+        return {"message": "Signup successful", "url":base_url+AWS_S3_FOLDER+"/"+image_path[7:]}
+
+    except Exception as e:
+        return {"signup":"False", "Error": str(e)}
 
     
 @app.post("/signin/")
-async def face_signin(image: str = Form(...)):
+async def face_signin(image: str = Form(None)):
+ 
+    try:
+        
+        base64.b64decode(image)
+        print("success")
+        image_path = base64_to_jpg(image, "temp/temp.jpg")
+        result= signin(image_path, "signup")
+        return result
 
-    image_path = base64_to_jpg(image, "temp/temp.jpg")
+
+        
+        
+    except Exception as e:
+        return {"signin":"False", "Reason": "Invalid Base64 is sent"}
     # print(image_path)
-    result= signin(image_path, "signup")
-    print(result)
-    return result
+    # result= signin(image_path, "signup")
+    # print(result)
 
 if __name__ == "__main__":
     import uvicorn
